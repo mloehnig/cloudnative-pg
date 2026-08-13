@@ -26,6 +26,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -144,6 +145,14 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	r.setDefaultPlugins(configuration.Current)
 	r.setProbes()
 	r.tryConvertAlphaFailoverQuorum()
+
+	r.Spec.StorageConfiguration.setAutoResizeDefaults()
+	if r.Spec.WalStorage != nil {
+		r.Spec.WalStorage.setAutoResizeDefaults()
+	}
+	for i := range r.Spec.Tablespaces {
+		r.Spec.Tablespaces[i].Storage.setAutoResizeDefaults()
+	}
 }
 
 func (r *Cluster) setDefaultPlugins(config *configuration.Data) {
@@ -354,6 +363,30 @@ func (r *Cluster) tryConvertAlphaFailoverQuorum() {
 	}
 
 	r.Spec.PostgresConfiguration.Synchronous.FailoverQuorum = v
+}
+
+// setAutoResizeDefaults fills unset StorageAutoResize fields with defaults.
+// A no-op when auto-resize is not configured.
+func (s *StorageConfiguration) setAutoResizeDefaults() {
+	if s.AutoResize == nil {
+		return
+	}
+	ar := s.AutoResize
+	if ar.UsageThreshold == 0 {
+		ar.UsageThreshold = 80
+	}
+	if ar.Step == "" {
+		ar.Step = "20%"
+	}
+	if ar.MinStep == nil {
+		ar.MinStep = ptr.To(resource.MustParse("2Gi"))
+	}
+	if ar.MaxStep == nil {
+		ar.MaxStep = ptr.To(resource.MustParse("500Gi"))
+	}
+	if ar.MaxResizesPerDay == 0 {
+		ar.MaxResizesPerDay = 3
+	}
 }
 
 // NewLivenessPingerConfigFromAnnotations creates a new pinger configuration from the annotations
