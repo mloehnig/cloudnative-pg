@@ -7320,7 +7320,7 @@ var _ = Describe("StorageAutoResize validation", func() {
 
 	It("accepts a valid config on a data volume", func() {
 		c := baseCluster(&apiv1.StorageAutoResize{
-			UsageThreshold:     80, Step: "20%",
+			UsageThreshold: 80, Step: "20%",
 			MinStep:            ptr.To(resource.MustParse("2Gi")),
 			MaxStep:            ptr.To(resource.MustParse("500Gi")),
 			Limit:              ptr.To(resource.MustParse("100Gi")),
@@ -7351,7 +7351,7 @@ var _ = Describe("StorageAutoResize validation", func() {
 
 	It("rejects limit smaller than size", func() {
 		c := baseCluster(&apiv1.StorageAutoResize{
-			UsageThreshold:     80, Step: "20%",
+			UsageThreshold: 80, Step: "20%",
 			Limit:              ptr.To(resource.MustParse("5Gi")),
 			AcknowledgeWALRisk: true,
 		})

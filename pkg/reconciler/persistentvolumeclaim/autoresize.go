@@ -171,6 +171,10 @@ func reconcileAutoResize(
 					pvc.Name+": "+outcome.SkipReason)
 				blockedReason = apiv1.StorageAutoResizeBudgetExhausted
 				blockedMessage = pvc.Name + ": " + outcome.SkipReason
+			default:
+				// Log non-actionable skips (e.g. usage below triggers) at trace level
+				// to avoid log spam while still making unexpected skip reasons diagnosable.
+				contextLogger.Trace("auto-resize skipped", "pvcName", pvc.Name, "reason", outcome.SkipReason)
 			}
 			continue
 		}
@@ -205,6 +209,9 @@ func reconcileAutoResize(
 	}
 
 	// Reflect the outcome as a cluster condition.
+	// A blocked volume (at-limit or budget-exhausted) takes precedence over a
+	// successful resize elsewhere in the same pass: the condition surfaces the
+	// actionable problem rather than masking it behind an unrelated success.
 	switch {
 	case blockedReason != "":
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{

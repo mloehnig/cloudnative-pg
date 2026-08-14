@@ -376,7 +376,9 @@ amount). Whichever trigger fires first causes a resize. The operator never edits
   occur even if usage continues to rise.
 - `maxResizesPerDay` (default: `3`): Rolling 24-hour budget for automatic resizes.
   This reserves capacity for manual intervention and respects cloud provider limits
-  on volume modifications. Set to `-1` to disable the limit.
+  on volume modifications. Set to `-1` to disable the limit. Note: a value of `0`
+  is treated as unset and defaults to `3` due to Go's zero-value semantics; use `-1`
+  to explicitly disable the per-day limit.
 - `acknowledgeWALRisk` (required for WAL volumes): Must be set to `true` to enable
   auto-resize on a volume that holds the Write-Ahead Log (WAL).
 
