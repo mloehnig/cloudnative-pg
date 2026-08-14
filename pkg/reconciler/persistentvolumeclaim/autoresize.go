@@ -177,6 +177,8 @@ func reconcileAutoResize(
 
 		if err := patchPVCStorageRequest(ctx, c, pvc, outcome.NewSize); err != nil {
 			storageAutoResizeTotal.WithLabelValues(volumeName, "error").Inc()
+			contextLogger.Error(err, "failed to auto-resize PVC",
+				"pvcName", pvc.Name, "from", current.String(), "to", outcome.NewSize.String())
 			return err
 		}
 		storageAutoResizeTotal.WithLabelValues(volumeName, "resized").Inc()

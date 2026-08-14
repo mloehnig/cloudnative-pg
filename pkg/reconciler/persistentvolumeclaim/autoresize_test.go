@@ -145,7 +145,9 @@ var _ = Describe("ReconcileAutoResize", func() {
 		size := got.Spec.Resources.Requests["storage"]
 		expected12Gi := resource.MustParse("12Gi")
 		Expect(size.Value()).To(Equal(expected12Gi.Value()))
-		Expect(cluster.Status.StorageResizeHistory["cluster-1"]).To(HaveLen(1))
+		var gotCluster apiv1.Cluster
+		Expect(cli.Get(context.Background(), client.ObjectKey{Namespace: ns, Name: "cluster-1"}, &gotCluster)).To(Succeed())
+		Expect(gotCluster.Status.StorageResizeHistory["cluster-1"]).To(HaveLen(1))
 	})
 
 	It("does not resize when usage is below threshold", func() {
@@ -178,5 +180,8 @@ var _ = Describe("ReconcileAutoResize", func() {
 		size := got.Spec.Resources.Requests["storage"]
 		expected10Gi := resource.MustParse("10Gi")
 		Expect(size.Value()).To(Equal(expected10Gi.Value()))
+		var gotCluster apiv1.Cluster
+		Expect(cli.Get(context.Background(), client.ObjectKey{Namespace: ns, Name: "cluster-1"}, &gotCluster)).To(Succeed())
+		Expect(gotCluster.Status.StorageResizeHistory).To(BeEmpty())
 	})
 })
