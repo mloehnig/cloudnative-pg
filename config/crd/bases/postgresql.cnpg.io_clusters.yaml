@@ -7748,6 +7748,36 @@ spec:
                   through the scale sub-resource so an autoscaler (such as HPA or VPA)
                   can discover the managed instance pods.
                 type: string
+              storageResizeHistory:
+                additionalProperties:
+                  items:
+                    description: StorageResizeEvent records a single automatic PVC
+                      resize.
+                    properties:
+                      fromSize:
+                        description: FromSize is the PVC storage request before the
+                          resize.
+                        type: string
+                      reason:
+                        description: Reason is the trigger that caused the resize.
+                        type: string
+                      timestamp:
+                        description: Timestamp is when the resize was performed.
+                        format: date-time
+                        type: string
+                      toSize:
+                        description: ToSize is the PVC storage request after the resize.
+                        type: string
+                    required:
+                    - fromSize
+                    - timestamp
+                    - toSize
+                    type: object
+                  type: array
+                description: |-
+                  StorageResizeHistory records recent automatic PVC resizes, keyed by PVC
+                  name, and backs the per-day rate-limit budget.
+                type: object
               switchReplicaClusterStatus:
                 description: SwitchReplicaClusterStatus is the status of the switch
                   to replica cluster

@@ -1133,6 +1133,24 @@ type ClusterStatus struct {
 	// SystemID is the latest detected PostgreSQL SystemID
 	// +optional
 	SystemID string `json:"systemID,omitempty"`
+
+	// StorageResizeHistory records recent automatic PVC resizes, keyed by PVC
+	// name, and backs the per-day rate-limit budget.
+	// +optional
+	StorageResizeHistory map[string][]StorageResizeEvent `json:"storageResizeHistory,omitempty"`
+}
+
+// StorageResizeEvent records a single automatic PVC resize.
+type StorageResizeEvent struct {
+	// Timestamp is when the resize was performed.
+	Timestamp metav1.Time `json:"timestamp"`
+	// FromSize is the PVC storage request before the resize.
+	FromSize string `json:"fromSize"`
+	// ToSize is the PVC storage request after the resize.
+	ToSize string `json:"toSize"`
+	// Reason is the trigger that caused the resize.
+	// +optional
+	Reason string `json:"reason,omitempty"`
 }
 
 // ImageInfo contains the information about a PostgreSQL image
@@ -1190,6 +1208,9 @@ const (
 	// or .spec.postgresql.synchronous.nodeFailureDomainKeys.
 	// Only set when one of those fields is configured.
 	ConditionSyncReplicationTopologySatisfied ClusterConditionType = "SyncReplicationTopologySatisfied"
+
+	// ConditionStorageAutoResize reports the state of automatic PVC resizing.
+	ConditionStorageAutoResize ClusterConditionType = "StorageAutoResize"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1259,6 +1280,13 @@ const (
 	// are set but no synchronous replica in a different failure domain than
 	// the primary exists.
 	ConditionReasonInsufficientCrossDomainReplicas ConditionReason = "InsufficientCrossDomainReplicas"
+
+	// StorageAutoResizePerformed indicates one or more PVCs were auto-resized.
+	StorageAutoResizePerformed ConditionReason = "StorageAutoResizePerformed"
+	// StorageAutoResizeAtLimit indicates a triggered volume is at its limit.
+	StorageAutoResizeAtLimit ConditionReason = "StorageAutoResizeAtLimit"
+	// StorageAutoResizeBudgetExhausted indicates the daily budget is used up.
+	StorageAutoResizeBudgetExhausted ConditionReason = "StorageAutoResizeBudgetExhausted"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster

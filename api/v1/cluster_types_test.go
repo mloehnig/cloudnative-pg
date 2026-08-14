@@ -27,6 +27,19 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var _ = Describe("StorageResizeHistory deepcopy", func() {
+	It("deep-copies the history map", func() {
+		status := &ClusterStatus{
+			StorageResizeHistory: map[string][]StorageResizeEvent{
+				"cluster-1": {{FromSize: "10Gi", ToSize: "12Gi", Reason: "threshold"}},
+			},
+		}
+		clone := status.DeepCopy()
+		clone.StorageResizeHistory["cluster-1"][0].ToSize = "20Gi"
+		Expect(status.StorageResizeHistory["cluster-1"][0].ToSize).To(Equal("12Gi"))
+	})
+})
+
 var _ = Describe("StorageAutoResize deepcopy", func() {
 	It("deep-copies pointer fields independently", func() {
 		orig := &StorageConfiguration{
