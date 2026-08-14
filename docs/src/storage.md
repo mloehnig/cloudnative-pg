@@ -345,6 +345,84 @@ cluster-example-3-join-v2      0/1     Completed   0          17s
 cluster-example-3              1/1     Running     0          10s
 ```
 
+### Automatic volume expansion (auto-resize)
+
+CloudNativePG can automatically grow volumes when disk usage reaches a threshold,
+without manual intervention. This feature is configured per-volume under
+`storage.autoResize` and applies equally to `walStorage.autoResize` and each
+tablespace's `storage.autoResize`.
+
+**How it works:** The operator monitors disk usage (reported by the instance manager)
+and automatically increases the PVC request when usage crosses the configured
+`usageThreshold` (a percentage) or drops below `minAvailable` (an absolute free-space
+amount). Whichever trigger fires first causes a resize. The operator never edits
+`spec.storage.size` directly — it only grows the PVC request and never shrinks.
+
+**Prerequisites:**
+- The storage class must have `allowVolumeExpansion: true`
+- `resizeInUseVolumes` must be enabled on the volume
+- If the volume holds WAL, `acknowledgeWALRisk` must be set to `true`
+
+**Configuration fields:**
+
+- `usageThreshold` (default: `80`): Percentage of disk in use that triggers a resize.
+- `minAvailable` (optional): Absolute free-space threshold (e.g., `"10Gi"`). The resize
+  is triggered when available space falls below this value.
+- `step` (default: `"20%"`): Growth increment — either a percentage (e.g., `"20%"`) or
+  an absolute quantity (e.g., `"10Gi"`).
+- `minStep` (default: `2Gi`): Minimum increment when `step` is a percentage.
+- `maxStep` (default: `500Gi`): Maximum increment when `step` is a percentage.
+- `limit` (optional): Hard cap on the PVC size. Once reached, no further auto-resizes
+  occur even if usage continues to rise.
+- `maxResizesPerDay` (default: `3`): Rolling 24-hour budget for automatic resizes.
+  This reserves capacity for manual intervention and respects cloud provider limits
+  on volume modifications. Set to `-1` to disable the limit.
+- `acknowledgeWALRisk` (required for WAL volumes): Must be set to `true` to enable
+  auto-resize on a volume that holds the Write-Ahead Log (WAL).
+
+**Behavior notes:**
+
+- The rolling 24-hour budget reserves at least one resize slot for manual intervention.
+- The operator never shrinks volumes; resize operations only increase the PVC request.
+- Once `limit` is reached, auto-resize is paused, and an event is emitted.
+- When `maxResizesPerDay` is exhausted, an event is emitted; resizes resume after
+  the oldest resize in the 24-hour window expires.
+
+**Observability:**
+
+CloudNativePG provides multiple signals to monitor auto-resize activity:
+
+- **Metrics:** `cnpg_disk_*` metrics (from the instance manager) and the
+  `cnpg_cluster_storage_autoresize_total` counter with labels for the volume and
+  resize result (`resized`, `at_limit`, `budget_exhausted`, `error`).
+- **Cluster condition:** `StorageAutoResize` reports the auto-resize state and
+  any limiting conditions.
+- **Kubernetes events:** `Normal` events on successful resize; `Warning` events
+  when the limit or budget is reached.
+- **Status history:** The `status.storageResizeHistory` tracks recent resize operations
+  per volume, with automatic pruning of entries older than 24 hours (up to 10 entries per volume).
+
+**Example:**
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: auto-resize-example
+spec:
+  instances: 3
+  storage:
+    size: 10Gi
+    resizeInUseVolumes: true
+    autoResize:
+      usageThreshold: 80
+      step: 20%
+      minStep: 2Gi
+      maxStep: 500Gi
+      limit: 200Gi
+      maxResizesPerDay: 3
+```
+
 ## Volume reduction
 
 Kubernetes does not provide an API to shrink a PVC, and CloudNativePG's
