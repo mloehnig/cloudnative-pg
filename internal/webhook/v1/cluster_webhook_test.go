@@ -7330,35 +7330,46 @@ var _ = Describe("StorageAutoResize validation", func() {
 	})
 
 	It("rejects usageThreshold out of range", func() {
-		c := baseCluster(&apiv1.StorageAutoResize{UsageThreshold: 120, Step: "20%"})
+		c := baseCluster(&apiv1.StorageAutoResize{UsageThreshold: 120, Step: "20%", AcknowledgeWALRisk: true})
 		Expect(v.validateStorageAutoResize(c)).NotTo(BeEmpty())
 	})
 
 	It("rejects an unparseable step", func() {
-		c := baseCluster(&apiv1.StorageAutoResize{UsageThreshold: 80, Step: "banana"})
+		c := baseCluster(&apiv1.StorageAutoResize{UsageThreshold: 80, Step: "banana", AcknowledgeWALRisk: true})
 		Expect(v.validateStorageAutoResize(c)).NotTo(BeEmpty())
 	})
 
 	It("rejects minStep greater than maxStep", func() {
 		c := baseCluster(&apiv1.StorageAutoResize{
 			UsageThreshold: 80, Step: "20%",
-			MinStep: ptr.To(resource.MustParse("10Gi")),
-			MaxStep: ptr.To(resource.MustParse("2Gi")),
+			MinStep:            ptr.To(resource.MustParse("10Gi")),
+			MaxStep:            ptr.To(resource.MustParse("2Gi")),
+			AcknowledgeWALRisk: true,
 		})
 		Expect(v.validateStorageAutoResize(c)).NotTo(BeEmpty())
 	})
 
 	It("rejects limit smaller than size", func() {
 		c := baseCluster(&apiv1.StorageAutoResize{
-			UsageThreshold: 80, Step: "20%",
-			Limit: ptr.To(resource.MustParse("5Gi")),
+			UsageThreshold:     80, Step: "20%",
+			Limit:              ptr.To(resource.MustParse("5Gi")),
+			AcknowledgeWALRisk: true,
 		})
 		Expect(v.validateStorageAutoResize(c)).NotTo(BeEmpty())
 	})
 
 	It("rejects resizeInUseVolumes=false with autoResize", func() {
-		c := baseCluster(&apiv1.StorageAutoResize{UsageThreshold: 80, Step: "20%"})
+		c := baseCluster(&apiv1.StorageAutoResize{UsageThreshold: 80, Step: "20%", AcknowledgeWALRisk: true})
 		c.Spec.StorageConfiguration.ResizeInUseVolumes = ptr.To(false)
+		Expect(v.validateStorageAutoResize(c)).NotTo(BeEmpty())
+	})
+
+	It("rejects minAvailable of zero", func() {
+		q := resource.MustParse("0")
+		c := baseCluster(&apiv1.StorageAutoResize{
+			UsageThreshold: 80, Step: "20%", AcknowledgeWALRisk: true,
+			MinAvailable: &q,
+		})
 		Expect(v.validateStorageAutoResize(c)).NotTo(BeEmpty())
 	})
 
