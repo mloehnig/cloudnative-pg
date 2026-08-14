@@ -938,6 +938,17 @@ func (r *ClusterReconciler) reconcileResources(
 		return res, err
 	}
 
+	if err := persistentvolumeclaim.ReconcileAutoResize(
+		ctx,
+		r.Client,
+		r.Recorder,
+		cluster,
+		resources.pvcs.Items,
+		instancesStatus,
+	); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Reconcile Pods
 	if res, err := r.reconcilePods(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
 		return res, err

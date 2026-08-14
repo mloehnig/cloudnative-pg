@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -146,20 +147,24 @@ func reconcilePVCQuantity(
 		return nil
 	}
 
-	oldPVC := pvc.DeepCopy()
-	// right now we reconcile the metadata in a different set of functions, so it's not needed to do it here
-	pvc = resources.NewPersistentVolumeClaimBuilderFromPVC(pvc).
-		WithRequests(corev1.ResourceList{"storage": *parsedSize}).
-		Build()
-
-	if err := c.Patch(ctx, pvc, client.MergeFrom(oldPVC)); err != nil {
+	if err := patchPVCStorageRequest(ctx, c, pvc, *parsedSize); err != nil {
 		contextLogger.Error(err, "error while changing PVC storage requirement",
-			"pvcName", pvc.Name,
-			"pvc", pvc,
-			"requests", pvc.Spec.Resources.Requests,
-			"oldRequests", oldPVC.Spec.Resources.Requests)
+			"pvcName", pvc.Name)
 		return fmt.Errorf("error while changing PVC storage requirement: %w", err)
 	}
-
 	return nil
+}
+
+// patchPVCStorageRequest patches a PVC's storage request to newSize.
+func patchPVCStorageRequest(
+	ctx context.Context,
+	c client.Client,
+	pvc *corev1.PersistentVolumeClaim,
+	newSize resource.Quantity,
+) error {
+	oldPVC := pvc.DeepCopy()
+	updated := resources.NewPersistentVolumeClaimBuilderFromPVC(pvc).
+		WithRequests(corev1.ResourceList{"storage": newSize}).
+		Build()
+	return c.Patch(ctx, updated, client.MergeFrom(oldPVC))
 }
