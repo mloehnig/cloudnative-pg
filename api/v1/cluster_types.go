@@ -1133,6 +1133,24 @@ type ClusterStatus struct {
 	// SystemID is the latest detected PostgreSQL SystemID
 	// +optional
 	SystemID string `json:"systemID,omitempty"`
+
+	// StorageResizeHistory records recent automatic PVC resizes, keyed by PVC
+	// name, and backs the per-day rate-limit budget.
+	// +optional
+	StorageResizeHistory map[string][]StorageResizeEvent `json:"storageResizeHistory,omitempty"`
+}
+
+// StorageResizeEvent records a single automatic PVC resize.
+type StorageResizeEvent struct {
+	// Timestamp is when the resize was performed.
+	Timestamp metav1.Time `json:"timestamp"`
+	// FromSize is the PVC storage request before the resize.
+	FromSize string `json:"fromSize"`
+	// ToSize is the PVC storage request after the resize.
+	ToSize string `json:"toSize"`
+	// Reason is the trigger that caused the resize.
+	// +optional
+	Reason string `json:"reason,omitempty"`
 }
 
 // ImageInfo contains the information about a PostgreSQL image
@@ -1190,6 +1208,9 @@ const (
 	// or .spec.postgresql.synchronous.nodeFailureDomainKeys.
 	// Only set when one of those fields is configured.
 	ConditionSyncReplicationTopologySatisfied ClusterConditionType = "SyncReplicationTopologySatisfied"
+
+	// ConditionStorageAutoResize reports the state of automatic PVC resizing.
+	ConditionStorageAutoResize ClusterConditionType = "StorageAutoResize"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1259,6 +1280,13 @@ const (
 	// are set but no synchronous replica in a different failure domain than
 	// the primary exists.
 	ConditionReasonInsufficientCrossDomainReplicas ConditionReason = "InsufficientCrossDomainReplicas"
+
+	// StorageAutoResizePerformed indicates one or more PVCs were auto-resized.
+	StorageAutoResizePerformed ConditionReason = "StorageAutoResizePerformed"
+	// StorageAutoResizeAtLimit indicates a triggered volume is at its limit.
+	StorageAutoResizeAtLimit ConditionReason = "StorageAutoResizeAtLimit"
+	// StorageAutoResizeBudgetExhausted indicates the daily budget is used up.
+	StorageAutoResizeBudgetExhausted ConditionReason = "StorageAutoResizeBudgetExhausted"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
@@ -2327,6 +2355,61 @@ type StorageConfiguration struct {
 	// Template to be used to generate the Persistent Volume Claim
 	// +optional
 	PersistentVolumeClaimTemplate *corev1.PersistentVolumeClaimSpec `json:"pvcTemplate,omitempty"`
+
+	// AutoResize enables automatic expansion of this volume's PVC based on
+	// the disk usage reported by the instance manager. When nil, auto-resize
+	// is disabled and behavior is unchanged.
+	// +optional
+	AutoResize *StorageAutoResize `json:"autoResize,omitempty"`
+}
+
+// StorageAutoResize configures automatic growth of a volume based on the
+// disk usage reported by the instance manager. Defaults are applied when the
+// block is present; see the cluster defaulting webhook.
+type StorageAutoResize struct {
+	// UsageThreshold is the percentage (1-99) of the volume in use at or above
+	// which a resize is triggered. Defaults to 80.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=99
+	// +optional
+	UsageThreshold int32 `json:"usageThreshold,omitempty"`
+
+	// MinAvailable triggers a resize when free space drops to or below this
+	// absolute amount (e.g. "10Gi"), independent of UsageThreshold. Whichever
+	// trigger fires first causes a resize.
+	// +optional
+	MinAvailable *resource.Quantity `json:"minAvailable,omitempty"`
+
+	// Step is the growth increment: a percentage of the current size ("20%")
+	// or an absolute quantity ("10Gi"). Defaults to "20%".
+	// +optional
+	Step string `json:"step,omitempty"`
+
+	// MinStep is the floor for a single growth step; only meaningful for
+	// percentage steps. Defaults to "2Gi".
+	// +optional
+	MinStep *resource.Quantity `json:"minStep,omitempty"`
+
+	// MaxStep is the ceiling for a single growth step; only meaningful for
+	// percentage steps. Defaults to "500Gi".
+	// +optional
+	MaxStep *resource.Quantity `json:"maxStep,omitempty"`
+
+	// Limit is a hard cap; the volume is never grown beyond this size.
+	// +optional
+	Limit *resource.Quantity `json:"limit,omitempty"`
+
+	// MaxResizesPerDay is the maximum number of autonomous resizes in a rolling
+	// 24h window. -1 disables the limit. Defaults to 3, reserving a slot for
+	// manual intervention when a cloud provider caps modifications.
+	// +optional
+	MaxResizesPerDay int32 `json:"maxResizesPerDay,omitempty"`
+
+	// AcknowledgeWALRisk must be set to true to enable auto-resize on a volume
+	// that holds WAL, acknowledging that growing storage can mask an underlying
+	// archiving or replication-slot failure.
+	// +optional
+	AcknowledgeWALRisk bool `json:"acknowledgeWALRisk,omitempty"`
 }
 
 // TablespaceConfiguration is the configuration of a tablespace, and includes

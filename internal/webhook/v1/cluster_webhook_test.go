@@ -7306,3 +7306,79 @@ var _ = Describe("getFailureDomainTopologyWarnings", func() {
 		Expect(warnings[0]).To(ContainSubstring("Topology labels could not be extracted"))
 	})
 })
+
+var _ = Describe("StorageAutoResize validation", func() {
+	v := &ClusterCustomValidator{}
+
+	baseCluster := func(ar *apiv1.StorageAutoResize) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				StorageConfiguration: apiv1.StorageConfiguration{Size: "10Gi", AutoResize: ar},
+			},
+		}
+	}
+
+	It("accepts a valid config on a data volume", func() {
+		c := baseCluster(&apiv1.StorageAutoResize{
+			UsageThreshold: 80, Step: "20%",
+			MinStep:            ptr.To(resource.MustParse("2Gi")),
+			MaxStep:            ptr.To(resource.MustParse("500Gi")),
+			Limit:              ptr.To(resource.MustParse("100Gi")),
+			AcknowledgeWALRisk: true,
+		})
+		Expect(v.validateStorageAutoResize(c)).To(BeEmpty())
+	})
+
+	It("rejects usageThreshold out of range", func() {
+		c := baseCluster(&apiv1.StorageAutoResize{UsageThreshold: 120, Step: "20%", AcknowledgeWALRisk: true})
+		Expect(v.validateStorageAutoResize(c)).NotTo(BeEmpty())
+	})
+
+	It("rejects an unparseable step", func() {
+		c := baseCluster(&apiv1.StorageAutoResize{UsageThreshold: 80, Step: "banana", AcknowledgeWALRisk: true})
+		Expect(v.validateStorageAutoResize(c)).NotTo(BeEmpty())
+	})
+
+	It("rejects minStep greater than maxStep", func() {
+		c := baseCluster(&apiv1.StorageAutoResize{
+			UsageThreshold: 80, Step: "20%",
+			MinStep:            ptr.To(resource.MustParse("10Gi")),
+			MaxStep:            ptr.To(resource.MustParse("2Gi")),
+			AcknowledgeWALRisk: true,
+		})
+		Expect(v.validateStorageAutoResize(c)).NotTo(BeEmpty())
+	})
+
+	It("rejects limit smaller than size", func() {
+		c := baseCluster(&apiv1.StorageAutoResize{
+			UsageThreshold: 80, Step: "20%",
+			Limit:              ptr.To(resource.MustParse("5Gi")),
+			AcknowledgeWALRisk: true,
+		})
+		Expect(v.validateStorageAutoResize(c)).NotTo(BeEmpty())
+	})
+
+	It("rejects resizeInUseVolumes=false with autoResize", func() {
+		c := baseCluster(&apiv1.StorageAutoResize{UsageThreshold: 80, Step: "20%", AcknowledgeWALRisk: true})
+		c.Spec.StorageConfiguration.ResizeInUseVolumes = ptr.To(false)
+		Expect(v.validateStorageAutoResize(c)).NotTo(BeEmpty())
+	})
+
+	It("rejects minAvailable of zero", func() {
+		q := resource.MustParse("0")
+		c := baseCluster(&apiv1.StorageAutoResize{
+			UsageThreshold: 80, Step: "20%", AcknowledgeWALRisk: true,
+			MinAvailable: &q,
+		})
+		Expect(v.validateStorageAutoResize(c)).NotTo(BeEmpty())
+	})
+
+	It("requires acknowledgeWALRisk when the data volume also holds WAL", func() {
+		// No walStorage => pgdata holds WAL => ack required.
+		c := baseCluster(&apiv1.StorageAutoResize{UsageThreshold: 80, Step: "20%"})
+		Expect(v.validateStorageAutoResize(c)).NotTo(BeEmpty())
+
+		c.Spec.StorageConfiguration.AutoResize.AcknowledgeWALRisk = true
+		Expect(v.validateStorageAutoResize(c)).To(BeEmpty())
+	})
+})

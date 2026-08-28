@@ -575,3 +575,52 @@ var _ = Describe("failover quorum defaults", func() {
 		Expect(cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum).To(BeTrue())
 	})
 })
+
+var _ = Describe("StorageAutoResize defaulting", func() {
+	It("fills defaults only when autoResize is present", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				StorageConfiguration: StorageConfiguration{
+					Size:       "10Gi",
+					AutoResize: &StorageAutoResize{},
+				},
+			},
+		}
+		cluster.setDefaults(true)
+
+		ar := cluster.Spec.StorageConfiguration.AutoResize
+		Expect(ar.UsageThreshold).To(BeNumerically("==", 80))
+		Expect(ar.Step).To(Equal("20%"))
+		Expect(ar.MinStep.String()).To(Equal("2Gi"))
+		Expect(ar.MaxStep.String()).To(Equal("500Gi"))
+		Expect(ar.MaxResizesPerDay).To(BeNumerically("==", 3))
+	})
+
+	It("leaves storage untouched when autoResize is nil", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{StorageConfiguration: StorageConfiguration{Size: "10Gi"}},
+		}
+		cluster.setDefaults(true)
+		Expect(cluster.Spec.StorageConfiguration.AutoResize).To(BeNil())
+	})
+
+	It("does not overwrite user-provided values", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+					AutoResize: &StorageAutoResize{
+						UsageThreshold:   90,
+						Step:             "5Gi",
+						MaxResizesPerDay: -1,
+					},
+				},
+			},
+		}
+		cluster.setDefaults(true)
+		ar := cluster.Spec.StorageConfiguration.AutoResize
+		Expect(ar.UsageThreshold).To(BeNumerically("==", 90))
+		Expect(ar.Step).To(Equal("5Gi"))
+		Expect(ar.MaxResizesPerDay).To(BeNumerically("==", -1))
+	})
+})

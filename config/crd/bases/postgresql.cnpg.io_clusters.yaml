@@ -6059,6 +6059,75 @@ spec:
               storage:
                 description: Configuration of the storage of the instances
                 properties:
+                  autoResize:
+                    description: |-
+                      AutoResize enables automatic expansion of this volume's PVC based on
+                      the disk usage reported by the instance manager. When nil, auto-resize
+                      is disabled and behavior is unchanged.
+                    properties:
+                      acknowledgeWALRisk:
+                        description: |-
+                          AcknowledgeWALRisk must be set to true to enable auto-resize on a volume
+                          that holds WAL, acknowledging that growing storage can mask an underlying
+                          archiving or replication-slot failure.
+                        type: boolean
+                      limit:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: Limit is a hard cap; the volume is never grown
+                          beyond this size.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      maxResizesPerDay:
+                        description: |-
+                          MaxResizesPerDay is the maximum number of autonomous resizes in a rolling
+                          24h window. -1 disables the limit. Defaults to 3, reserving a slot for
+                          manual intervention when a cloud provider caps modifications.
+                        format: int32
+                        type: integer
+                      maxStep:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          MaxStep is the ceiling for a single growth step; only meaningful for
+                          percentage steps. Defaults to "500Gi".
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      minAvailable:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          MinAvailable triggers a resize when free space drops to or below this
+                          absolute amount (e.g. "10Gi"), independent of UsageThreshold. Whichever
+                          trigger fires first causes a resize.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      minStep:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          MinStep is the floor for a single growth step; only meaningful for
+                          percentage steps. Defaults to "2Gi".
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      step:
+                        description: |-
+                          Step is the growth increment: a percentage of the current size ("20%")
+                          or an absolute quantity ("10Gi"). Defaults to "20%".
+                        type: string
+                      usageThreshold:
+                        description: |-
+                          UsageThreshold is the percentage (1-99) of the volume in use at or above
+                          which a resize is triggered. Defaults to 80.
+                        format: int32
+                        maximum: 99
+                        minimum: 1
+                        type: integer
+                    type: object
                   pvcTemplate:
                     description: Template to be used to generate the Persistent Volume
                       Claim
@@ -6311,6 +6380,75 @@ spec:
                     storage:
                       description: The storage configuration for the tablespace
                       properties:
+                        autoResize:
+                          description: |-
+                            AutoResize enables automatic expansion of this volume's PVC based on
+                            the disk usage reported by the instance manager. When nil, auto-resize
+                            is disabled and behavior is unchanged.
+                          properties:
+                            acknowledgeWALRisk:
+                              description: |-
+                                AcknowledgeWALRisk must be set to true to enable auto-resize on a volume
+                                that holds WAL, acknowledging that growing storage can mask an underlying
+                                archiving or replication-slot failure.
+                              type: boolean
+                            limit:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: Limit is a hard cap; the volume is never
+                                grown beyond this size.
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            maxResizesPerDay:
+                              description: |-
+                                MaxResizesPerDay is the maximum number of autonomous resizes in a rolling
+                                24h window. -1 disables the limit. Defaults to 3, reserving a slot for
+                                manual intervention when a cloud provider caps modifications.
+                              format: int32
+                              type: integer
+                            maxStep:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                MaxStep is the ceiling for a single growth step; only meaningful for
+                                percentage steps. Defaults to "500Gi".
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            minAvailable:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                MinAvailable triggers a resize when free space drops to or below this
+                                absolute amount (e.g. "10Gi"), independent of UsageThreshold. Whichever
+                                trigger fires first causes a resize.
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            minStep:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                MinStep is the floor for a single growth step; only meaningful for
+                                percentage steps. Defaults to "2Gi".
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            step:
+                              description: |-
+                                Step is the growth increment: a percentage of the current size ("20%")
+                                or an absolute quantity ("10Gi"). Defaults to "20%".
+                              type: string
+                            usageThreshold:
+                              description: |-
+                                UsageThreshold is the percentage (1-99) of the volume in use at or above
+                                which a resize is triggered. Defaults to 80.
+                              format: int32
+                              maximum: 99
+                              minimum: 1
+                              type: integer
+                          type: object
                         pvcTemplate:
                           description: Template to be used to generate the Persistent
                             Volume Claim
@@ -6723,6 +6861,75 @@ spec:
                 description: Configuration of the storage for PostgreSQL WAL (Write-Ahead
                   Log)
                 properties:
+                  autoResize:
+                    description: |-
+                      AutoResize enables automatic expansion of this volume's PVC based on
+                      the disk usage reported by the instance manager. When nil, auto-resize
+                      is disabled and behavior is unchanged.
+                    properties:
+                      acknowledgeWALRisk:
+                        description: |-
+                          AcknowledgeWALRisk must be set to true to enable auto-resize on a volume
+                          that holds WAL, acknowledging that growing storage can mask an underlying
+                          archiving or replication-slot failure.
+                        type: boolean
+                      limit:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: Limit is a hard cap; the volume is never grown
+                          beyond this size.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      maxResizesPerDay:
+                        description: |-
+                          MaxResizesPerDay is the maximum number of autonomous resizes in a rolling
+                          24h window. -1 disables the limit. Defaults to 3, reserving a slot for
+                          manual intervention when a cloud provider caps modifications.
+                        format: int32
+                        type: integer
+                      maxStep:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          MaxStep is the ceiling for a single growth step; only meaningful for
+                          percentage steps. Defaults to "500Gi".
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      minAvailable:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          MinAvailable triggers a resize when free space drops to or below this
+                          absolute amount (e.g. "10Gi"), independent of UsageThreshold. Whichever
+                          trigger fires first causes a resize.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      minStep:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          MinStep is the floor for a single growth step; only meaningful for
+                          percentage steps. Defaults to "2Gi".
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      step:
+                        description: |-
+                          Step is the growth increment: a percentage of the current size ("20%")
+                          or an absolute quantity ("10Gi"). Defaults to "20%".
+                        type: string
+                      usageThreshold:
+                        description: |-
+                          UsageThreshold is the percentage (1-99) of the volume in use at or above
+                          which a resize is triggered. Defaults to 80.
+                        format: int32
+                        maximum: 99
+                        minimum: 1
+                        type: integer
+                    type: object
                   pvcTemplate:
                     description: Template to be used to generate the Persistent Volume
                       Claim
@@ -7579,6 +7786,36 @@ spec:
                   through the scale sub-resource so an autoscaler (such as HPA or VPA)
                   can discover the managed instance pods.
                 type: string
+              storageResizeHistory:
+                additionalProperties:
+                  items:
+                    description: StorageResizeEvent records a single automatic PVC
+                      resize.
+                    properties:
+                      fromSize:
+                        description: FromSize is the PVC storage request before the
+                          resize.
+                        type: string
+                      reason:
+                        description: Reason is the trigger that caused the resize.
+                        type: string
+                      timestamp:
+                        description: Timestamp is when the resize was performed.
+                        format: date-time
+                        type: string
+                      toSize:
+                        description: ToSize is the PVC storage request after the resize.
+                        type: string
+                    required:
+                    - fromSize
+                    - timestamp
+                    - toSize
+                    type: object
+                  type: array
+                description: |-
+                  StorageResizeHistory records recent automatic PVC resizes, keyed by PVC
+                  name, and backs the per-day rate-limit budget.
+                type: object
               switchReplicaClusterStatus:
                 description: SwitchReplicaClusterStatus is the status of the switch
                   to replica cluster

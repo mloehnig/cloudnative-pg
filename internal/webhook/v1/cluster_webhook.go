@@ -182,6 +182,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateWalStorageSize,
 		v.validateEphemeralVolumeSource,
 		v.validateTablespaceStorageSize,
+		v.validateStorageAutoResize,
 		v.validateName,
 		v.validateTablespaceNames,
 		v.validateBootstrapPgBaseBackupSource,
@@ -1709,6 +1710,106 @@ func (v *ClusterCustomValidator) validateTablespaceStorageSize(r *apiv1.Cluster)
 		)
 	}
 	return result
+}
+
+func (v *ClusterCustomValidator) validateStorageAutoResize(r *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+	result = append(result, validateStorageAutoResizeConfig(
+		field.NewPath("spec", "storage"),
+		r.Spec.StorageConfiguration,
+		!r.ShouldCreateWalArchiveVolume(),
+	)...)
+	if r.Spec.WalStorage != nil {
+		result = append(result, validateStorageAutoResizeConfig(
+			field.NewPath("spec", "walStorage"),
+			*r.Spec.WalStorage,
+			true,
+		)...)
+	}
+	for i := range r.Spec.Tablespaces {
+		result = append(result, validateStorageAutoResizeConfig(
+			field.NewPath("spec", "tablespaces").Index(i).Child("storage"),
+			r.Spec.Tablespaces[i].Storage,
+			false,
+		)...)
+	}
+	return result
+}
+
+// validateStorageAutoResizeConfig validates one StorageConfiguration's
+// autoResize block. walBearing is true when the volume holds WAL.
+func validateStorageAutoResizeConfig(
+	structPath *field.Path,
+	storageConfiguration apiv1.StorageConfiguration,
+	walBearing bool,
+) field.ErrorList {
+	ar := storageConfiguration.AutoResize
+	if ar == nil {
+		return nil
+	}
+	path := structPath.Child("autoResize")
+	var result field.ErrorList
+
+	if storageConfiguration.ResizeInUseVolumes != nil && !*storageConfiguration.ResizeInUseVolumes {
+		result = append(result, field.Invalid(structPath.Child("resizeInUseVolumes"), false,
+			"autoResize requires resizeInUseVolumes to be enabled"))
+	}
+
+	if ar.UsageThreshold < 1 || ar.UsageThreshold > 99 {
+		result = append(result, field.Invalid(path.Child("usageThreshold"), ar.UsageThreshold,
+			"usageThreshold must be between 1 and 99"))
+	}
+
+	if err := validateAutoResizeStep(ar.Step); err != nil {
+		result = append(result, field.Invalid(path.Child("step"), ar.Step, err.Error()))
+	}
+
+	if ar.MinStep != nil && ar.MaxStep != nil && ar.MinStep.Cmp(*ar.MaxStep) > 0 {
+		result = append(result, field.Invalid(path.Child("minStep"), ar.MinStep.String(),
+			"minStep must not be greater than maxStep"))
+	}
+
+	if ar.MinAvailable != nil && ar.MinAvailable.Sign() <= 0 {
+		result = append(result, field.Invalid(path.Child("minAvailable"), ar.MinAvailable.String(),
+			"minAvailable must be greater than zero"))
+	}
+
+	if ar.Limit != nil {
+		if size := storageConfiguration.GetSizeOrNil(); size != nil && ar.Limit.Cmp(*size) < 0 {
+			result = append(result, field.Invalid(path.Child("limit"), ar.Limit.String(),
+				"limit must not be smaller than the configured size"))
+		}
+	}
+
+	if walBearing && !ar.AcknowledgeWALRisk {
+		result = append(result, field.Invalid(path.Child("acknowledgeWALRisk"), ar.AcknowledgeWALRisk,
+			"acknowledgeWALRisk must be true to auto-resize a volume that holds WAL"))
+	}
+
+	return result
+}
+
+// validateAutoResizeStep checks a step is a positive percentage ("20%") or a
+// valid positive quantity ("10Gi").
+func validateAutoResizeStep(step string) error {
+	if step == "" {
+		return nil // defaulting supplies "20%"
+	}
+	if pct, ok := strings.CutSuffix(step, "%"); ok {
+		n, err := strconv.Atoi(pct)
+		if err != nil || n < 1 || n > 100 {
+			return fmt.Errorf("percentage step must be an integer between 1 and 100")
+		}
+		return nil
+	}
+	q, err := resource.ParseQuantity(step)
+	if err != nil {
+		return fmt.Errorf("step is neither a valid percentage nor a valid quantity")
+	}
+	if q.Sign() <= 0 {
+		return fmt.Errorf("step quantity must be greater than zero")
+	}
+	return nil
 }
 
 func validateStorageConfigurationSize(
