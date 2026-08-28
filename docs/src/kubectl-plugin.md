@@ -778,8 +778,7 @@ Archive:  report_cluster_example_<TIMESTAMP>.zip
    creating: report_cluster_example_<TIMESTAMP>/logs/
   inflating: report_cluster_example_<TIMESTAMP>/logs/cluster-example-full-1.jsonl
    creating: report_cluster_example_<TIMESTAMP>/job-logs/
-  inflating: report_cluster_example_<TIMESTAMP>/job-logs/cluster-example-full-1-initdb-qnnvw.jsonl
-  inflating: report_cluster_example_<TIMESTAMP>/job-logs/cluster-example-full-2-join-tvj8r.jsonl
+  inflating: report_cluster_example_<TIMESTAMP>/job-logs/cluster-example-full-1-major-upgrade-qnnvw.jsonl
 ```
 
 ### Logs
@@ -1086,7 +1085,7 @@ method should be used with extreme care, by authorized personnel only.
 ```console
 $ kubectl cnpg psql cluster-example
 
-psql (18.4 (Debian 18.4-1.pgdg110+1))
+psql (18.6 (Debian 18.6-1.pgdg110+1))
 Type "help" for help.
 
 postgres=#
@@ -1098,7 +1097,7 @@ select to work against a replica by using the `--replica` option:
 ```console
 $ kubectl cnpg psql --replica cluster-example
 
-psql (18.4 (Debian 18.4-1.pgdg110+1))
+psql (18.6 (Debian 18.6-1.pgdg110+1))
 
 Type "help" for help.
 
@@ -1121,7 +1120,7 @@ specific database:
 ```console
 $ kubectl cnpg psql cluster-example -- app
 
-psql (18.4 (Debian 18.4-1.pgdg110+1))
+psql (18.6 (Debian 18.6-1.pgdg110+1))
 Type "help" for help.
 
 app=#
